@@ -44,8 +44,8 @@ with step("S2", "Sketch the base rectangle on the XY plane.", "The block grows u
                      + [Sketcher.Constraint("Horizontal", 0), Sketcher.Constraint("Horizontal", 2),
                         Sketcher.Constraint("Vertical", 1), Sketcher.Constraint("Vertical", 3),
                         Sketcher.Constraint("Coincident", 0, 1, -1, 1)])
-    for k, (kind, g, name, expr) in enumerate([("DistanceX", 0, "W", "Params.Width"),
-                                               ("DistanceY", 1, "D", "Params.Depth")]):
+    for k, (kind, g, name, expr) in enumerate([("DistanceX", 0, "Wd", "Params.Width"),
+                                               ("DistanceY", 1, "Dp", "Params.Depth")]):
         i = sk.addConstraint(Sketcher.Constraint(kind, g, 1, g, 2, (W, D)[k]))
         sk.renameConstraint(i, name)
         sk.setExpression(f"Constraints.{name}", expr)
