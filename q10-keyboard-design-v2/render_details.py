@@ -58,3 +58,14 @@ for ax,(axis,at,ix,iy,xl,lim) in zip(axs,[('x',px,1,2,'Y',(-35,30)),('y',0.0,0,2
     ax.axhline(10,color='#8172B2',ls=':',lw=1); ax.text(lim[0]+0.5,10.2,'screen Z=10',fontsize=8,color='#8172B2')
 axs[0].legend(loc='lower left',fontsize=8)
 fig.tight_layout(); fig.savefig(OUT+'detail_dock_sections.png',dpi=80); print('IMG sections')
+
+# Plan sections of the keyboard: pad magnet slots and the lobed post mouth.
+fig,axs=plt.subplots(1,2,figsize=(16,8))
+pt=P.PadT.Value; zs=-pt+P.SkinT.Value+P.PocketDepth.Value/2; zl=P.EarT.Value+P.PostL.Value-1.0
+for ax,(z,title,xl,yl) in zip(axs,[(zs,'Pad magnet slots, Z=%.2f (KB frame)'%zs,(-40,40),(-52,-27)),
+                                     (zl,'Post mouth with 3 lobes, Z=%.2f (KB frame)'%zl,(px-6,px+6),(P.EarY.Value-6,P.EarY.Value+6))]):
+    for w in kb.slice(V(0,0,1),z):
+        pts=np.array([[p.x,p.y] for p in w.discretize(Deflection=0.01)])
+        ax.fill(pts[:,0],pts[:,1],color='#C44E52',alpha=0.3,lw=0); ax.plot(pts[:,0],pts[:,1],color='#C44E52',lw=1)
+    ax.set_xlim(*xl); ax.set_ylim(*yl); ax.set_aspect('equal'); ax.grid(alpha=.3); ax.set_title(title)
+fig.tight_layout(); fig.savefig(OUT+'detail_keyboard_sections.png',dpi=80); print('IMG keyboard sections')

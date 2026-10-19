@@ -1,9 +1,11 @@
 """Pixel 10 Pro + BBQ10 (Q10) keyboard dock, v2. Change values in Params only.
 
 Parts: PhoneMount (plate, ColL, ColR), MagnetCap (print 2), Keyboard (BBQ10
-bottom case with a dock bar that carries PostL/PostR). Phone and MetalPin
-bodies are references. Magnets slide into closed slots; only the cap centre
-magnet goes in from the bottom.
+bottom case with a dock bar that carries PostL/PostR, and two magnet pads under
+the bottom corners). Phone and MetalPin bodies are references. Magnets slide
+into closed slots; only the cap centre magnet goes in from the bottom.
+Positions: 1 keyboard docked below the phone on the posts; 2 keyboard keys-up
+on the phone, pads on the caps; 3 keyboard leaning from the plate to the caps.
 
 Run: SKILL_DIR=<repo root> FreeCADCmd build_dock.py
 Outputs go to OUT_DIR (default: ./out next to this script).
@@ -35,7 +37,8 @@ doc = App.newDocument("Q10Dock")
 # ---------------------------------------------------------------- helpers
 PV = {}
 ENV = {"tan": lambda a: math.tan(math.radians(a)), "sin": lambda a: math.sin(math.radians(a)),
-       "cos": lambda a: math.cos(math.radians(a)), "abs": abs, "pi": math.pi}
+       "cos": lambda a: math.cos(math.radians(a)), "abs": abs, "pi": math.pi, "sqrt": math.sqrt,
+       "asin": lambda v: math.degrees(math.asin(v)), "atan": lambda v: math.degrees(math.atan(v))}
 
 
 def ev(expr):
@@ -225,9 +228,9 @@ decide("D5", "The keyboard Body starts from the BBQ10 bottom case STEP (MIT lice
        "The user STL is not a closed solid. The STEP is the same case without the old posts.")
 decide("D6", "Magnets are 5 mm diameter x 2 mm, poles on the flat faces, in a 3x3 array.",
        "User measurements. Magnet size drives the cap, column and ear size.")
-decide("D7", "Metal pin: banana male 3.5 mm, with an assumed 5 mm x 1.5 mm collar. "
-       "Change PinHeadD, PinHeadL and PinShankL to the real part.",
-       "Only the 3.5 mm diameter is known.")
+decide("D7", "Metal pin: 2 mm banana male. Its spring is 3.5 mm at rest, in the middle of the "
+       "contact. The base is not measured: PinHeadD, PinHeadL and PinShankL are assumptions.",
+       "User: 2 mm plug, 3.5 mm where it flexes, base not in the measurement.")
 
 with step("S1", "Make the parameters.", "All dimensions come from Params."):
     asm = doc.addObject("App::Part", "Dock")
@@ -262,14 +265,19 @@ with step("S1", "Make the parameters.", "All dimensions come from Params."):
         ("MagT", LEN, 2.0, "Magnet thickness."),
         ("MagWeb", LEN, 1.0, "Wall between two magnet pockets."),
         ("MagEdge", LEN, 1.4, "Wall between a magnet pocket and the cap side."),
-        ("KinkAngle", ANG, 17.5, "Kink bevel angle for the landscape position."),
         ("CapH", LEN, 5.8, "Magnet cap height on the flat part."),
         ("ScreenGap", LEN, 0.5, "Cap top above the screen surface."),
-        ("PinD", LEN, 3.5, "Metal pin (banana male) contact diameter."),
-        ("PinShankL", LEN, 6.0, "Metal pin length below the collar."),
-        ("PinHeadD", LEN, 5.0, "Metal pin collar diameter."),
-        ("PinHeadL", LEN, 1.5, "Metal pin collar length."),
+        ("PinD", LEN, 2.0, "Metal pin nominal diameter (2 mm banana). The post bore grips it."),
+        ("PinSpringD", LEN, 3.5, "Metal pin spring diameter at rest, in the middle of the contact."),
+        ("PinShankL", LEN, 6.0, "Assumed: metal pin contact length below the base."),
+        ("PinHeadD", LEN, 5.0, "Assumed: metal pin base diameter."),
+        ("PinHeadL", LEN, 1.5, "Assumed: metal pin base length."),
         ("PostOD", LEN, 8.0, "Keyboard post outer diameter."),
+        ("PostBoreD", LEN, 3.6, "Measured from the fitted test post: bore for the banana plug."),
+        ("PostLobeD", LEN, 3.28, "Measured from the fitted test post: diameter across the 3 lobes."),
+        ("PostReliefD", LEN, 4.14, "Measured from the fitted test post: relief between the lobes."),
+        ("PostLobeL", LEN, 2.0, "Measured from the fitted test post: lobe length at the bore mouth."),
+        ("LobeR", LEN, 0.5, "Radius of each lobe rib."),
         ("SocketDepth", LEN, 6.0, "Column socket depth from the plate bottom."),
         ("PostTipGap", LEN, 0.3, "Gap between the post tip and the socket ceiling."),
         ("SlitW", LEN, 0.8, "Width of the two slits in each post."),
@@ -289,6 +297,11 @@ with step("S1", "Make the parameters.", "All dimensions come from Params."):
         ("KbW", LEN, 71.81, "Measured: BBQ10 bottom case width."),
         ("KbH", LEN, 7.0, "Measured: BBQ10 bottom case height."),
         ("KbFloorZ", LEN, 1.2, "Measured: top wall openings start above this height."),
+        ("KbDepth", LEN, 50.58, "Measured: case depth from the top wall face to the bottom edge."),
+        ("KbCornerR", LEN, 12.35, "Measured: case bottom corner radius in plan."),
+        ("KbScrewX", LEN, 31.05, "Measured: bottom screw hole distance from the centre line."),
+        ("KbScrewY", DST, -42.38, "Measured: bottom screw hole Y."),
+        ("KbScrewHeadD", LEN, 4.2, "Measured: bottom screw countersink diameter."),
         ("KbTabY", LEN, 1.0, "Measured: top-edge tabs protrude this far past the wall."),
         ("KbTabZ", LEN, 2.0, "Measured: tab bottom above the case floor face."),
         ("Pitch", LEN, "Params.MagD + 2 * Params.Clearance + Params.MagWeb",
@@ -302,8 +315,8 @@ with step("S1", "Make the parameters.", "All dimensions come from Params."):
         ("PostX", LEN, "Params.KbW / 2 - Params.CapW / 2",
          "Derived. Column and post axis distance from the centre line."),
         ("SocketD", LEN, "Params.PostOD + 2 * Params.Clearance", "Derived. Socket diameter."),
-        ("PinBoreD", LEN, "Params.PinD + 2 * Params.Clearance",
-         "Derived. Pin bore in the column and the post."),
+        ("PinBoreD", LEN, "Params.PinSpringD + 2 * Params.Clearance",
+         "Derived. Column pin bore. The spring passes it freely."),
         ("HeadBoreD", LEN, "Params.PinHeadD + 2 * Params.Clearance",
          "Derived. Collar counterbore diameter."),
         ("HeadBoreDepth", LEN, "Params.PinHeadL + Params.Clearance",
@@ -319,15 +332,27 @@ with step("S1", "Make the parameters.", "All dimensions come from Params."):
          "Derived. Y of the ring centre."),
         ("PlateW", LEN, "Params.PhoneW + 2 * Params.Clearance + 2 * Params.LipT",
          "Derived. Plate width."),
+        ("PadT", LEN, "Params.SkinT + Params.PocketDepth", "Derived. Magnet pad thickness."),
+        ("PadY", DST, "-Params.KbDepth + Params.CapW / 2", "Derived. Magnet pad centre Y."),
+        ("ScrewHoleD", LEN, "Params.KbScrewHeadD + 2 * Params.Clearance",
+         "Derived. Screw access hole through the pad."),
+        ("KbLen", LEN, "Params.KbDepth + Params.BarY + Params.CapW + Params.TongueL",
+         "Derived. Keyboard end-to-end length."),
+        ("KinkAngle", ANG, "asin((Params.PhoneT + Params.ScreenGap) / sqrt(Params.KbLen * Params.KbLen"
+         " + Params.PadT * Params.PadT)) + atan(Params.PadT / Params.KbLen)",
+         "Derived. Position 3: right triangle of keyboard length and column height."),
         ("KinkY", DST, "-Params.Pitch / 2", "Derived. Kink line Y on the cap."),
-        ("KinkRowY", DST, "-Params.Pitch - Params.PocketDepth * sin(Params.KinkAngle)",
-         "Derived. Kink magnet row Y on the cap."),
+        ("KinkRowY", DST, "Params.KinkY - (Params.MagEdge + Params.PocketD / 2) * cos(Params.KinkAngle)",
+         "Derived. Kink magnet row Y: under the pad edge row in position 3."),
     ]:
         param(name, kind, value, use)
     doc.recompute()
     spec("params evaluate", abs(P.CapW.Value - PV["CapW"]) < 1e-6, f"CapW {P.CapW} vs {PV['CapW']}")
 
 g = dict(PV)  # short names for predictions
+# Pad magnets (i outward, j toward the keyboard top). The screw hole and the
+# rounded case corner take (1, 0) and (1, -1); the centre has no free side.
+PAD_MAGNETS = [(-1, -1), (0, -1), (-1, 0), (-1, 1), (0, 1), (1, 1)]
 Clr, CapW, R = g["Clearance"], g["CapW"], g["EdgeR"]
 decide("D8", f"Cap and column are {CapW:.2f} mm square.",
        "This is the smallest square that holds the 3x3 magnet array.")
@@ -342,10 +367,25 @@ with step("S2", "Check the interface stack from the parameters.",
          f"tip Z {tip:.2f}")
     spec("web between socket and collar >= 1.2 mm", web >= 1.2, f"web {web:.2f}")
     spec("pin enters the post bore >= 2 mm", post_top - tip >= 2, f"{post_top - tip:.2f}")
-    spec("post wall >= 1.2 mm", (g["PostOD"] - g["PinBoreD"]) / 2 >= 1.2)
+    spec("post wall >= 1.2 mm", (g["PostOD"] - g["PostReliefD"]) / 2 >= 1.2)
+    spec("lobes stay inside the post", g["PostLobeD"] / 2 + 2 * g["LobeR"] < g["PostOD"] / 2 - 1)
+    spring = g["ColTop"] - g["HeadBoreDepth"] - g["PinShankL"] / 2
+    spec("pin spring is >= 1 mm inside the post bore", post_top - spring >= 1.0,
+         f"spring Z {spring:.2f}, post top Z {post_top:.2f}")
+    spec("spring is squeezed by the post lobes", g["PinSpringD"] > g["PostLobeD"])
     spec("slot lip leaves a channel", 0 < g["SlotLip"] < g["PocketD"] / 2 - 1)
-    spec("ear magnet wall to post bore >= 1.0 mm",
-         g["Pitch"] - g["PocketD"] / 2 - g["PinBoreD"] / 2 >= 1.0)
+    for i, j in PAD_MAGNETS:
+        d = math.hypot(i * g["Pitch"] - (g["KbScrewX"] - g["PostX"]),
+                       j * g["Pitch"] - (g["KbScrewY"] - g["PadY"]))
+        spec(f"pad magnet ({i},{j}) clear of the screw hole by 0.6 mm",
+             d >= g["PocketD"] / 2 + g["ScrewHoleD"] / 2 + 0.6, f"{d:.2f}")
+        mx, my = g["PostX"] + i * g["Pitch"], g["PadY"] + j * g["Pitch"]
+        cx, cy = g["KbW"] / 2 - g["KbCornerR"], -g["KbDepth"] + g["KbCornerR"]
+        d = math.hypot(mx - cx, my - cy)
+        spec(f"pad magnet ({i},{j}) inside the case corner by 0.6 mm",
+             mx <= cx or my >= cy or d + g["PocketD"] / 2 <= g["KbCornerR"] - 0.6, f"{d:.2f}")
+    spec("edge-row channel clear of the screw hole by 0.4 mm",
+         g["KbScrewX"] - g["ScrewHoleD"] / 2 - (g["PostX"] + g["PocketD"] / 2) >= 0.4)
     spec("column wall around socket >= 2 mm", (CapW - g["SocketD"]) / 2 >= 2)
     spec("post fillet stays inside the socket chamfer",
          g["PostOD"] / 2 + g["PostFillet"] <= g["SocketD"] / 2 + g["MouthChamfer"] - Clr)
@@ -431,7 +471,7 @@ with step("S7", "Cut the post sockets up from the plate bottom.", "Posts enter f
     solid_at(mount, V(g["PostX"], 0, -g["PlateT"] + g["SocketDepth"] + 0.1))
 
 with step("S8", "Cut the pin bores and collar counterbores from the column top.",
-          "The pin goes in from the top. Bore = PinD + 2 x Clearance."):
+          "The pin goes in from the top. Bore = PinSpringD + 2 x Clearance."):
     sk = sketch(mount, "PinBoreSketch", z="Params.ColTop")
     for sx in ("-", ""):
         sk.circle(f"{sx}Params.PostX", "0", "Params.PinBoreD")
@@ -443,7 +483,7 @@ with step("S8", "Cut the pin bores and collar counterbores from the column top."
     v_mount -= 2 * circ(g["PinBoreD"]) * (g["ColTop"] + g["PlateT"] - g["SocketDepth"])
     v_mount -= 2 * (circ(g["HeadBoreD"]) - circ(g["PinBoreD"])) * g["HeadBoreDepth"]
     expect(mount, volume=v_mount)
-    solid_at(mount, V(-g["PostX"] + g["PinD"] / 2 + Clr / 2, 0, 0), solid=False)
+    solid_at(mount, V(-g["PostX"] + g["PinSpringD"] / 2 + Clr / 2, 0, 0), solid=False)
 
 # Magnet caps: identical Bodies, origin on the axis at the cap bottom.
 caps = []
@@ -578,18 +618,35 @@ with step("S13", "Pad the base slab, then the dock bar with cheeks and tongue.",
     solid_at(kb, V(g["PostX"] - g["Pitch"], 0.5, (g["KbFloorZ"] + g["KbTabZ"]) / 2), solid=False)
 
 with step("S15", "Pad the posts and cut the pin bore through post and ear.",
-          "Bore = PinD + 2 x Clearance."):
+          "Bore sizes copy the test post that fits the banana plug."):
     sk = sketch(kb, "PostSketch", z="Params.EarT")
     for sx in ("-", ""):
         sk.circle(f"{sx}Params.PostX", "Params.EarY", "Params.PostOD")
     pad(kb, "Posts", sk, "Params.PostL")
     sk = sketch(kb, "PostBoreSketch", z="Params.EarT + Params.PostL")
     for sx in ("-", ""):
-        sk.circle(f"{sx}Params.PostX", "Params.EarY", "Params.PinBoreD")
+        sk.circle(f"{sx}Params.PostX", "Params.EarY", "Params.PostBoreD")
     pocket(kb, "PostBores", sk)
+    # The bore mouth copies the fitted test post: a relief with three lobes.
+    sk = sketch(kb, "ReliefSketch", z="Params.EarT + Params.PostL")
+    for sx in ("-", ""):
+        sk.circle(f"{sx}Params.PostX", "Params.EarY", "Params.PostReliefD")
+    pocket(kb, "Relief", sk, "Params.PostLobeL")
+    sk = sketch(kb, "LobeSketch", z="Params.EarT + Params.PostL")
+    rl = "(Params.PostLobeD / 2 + Params.LobeR)"
+    for sx in ("-", ""):
+        for cs, sn in ((0, 1), (-0.8660254, -0.5), (0.8660254, -0.5)):  # 90, 210, 330 deg
+            sk.circle(f"{sx}Params.PostX + ({cs}) * {rl}", f"Params.EarY + ({sn}) * {rl}",
+                      "2 * Params.LobeR")
+    pad(kb, "Lobes", sk, "Params.PostLobeL", reverse=True)
     expect(kb, hi=(None, None, max(g["EarT"] + g["PostL"], 7.0)))
+    top = g["EarT"] + g["PostL"]
     solid_at(kb, V(g["PostX"], g["EarY"], g["EarT"] / 2), solid=False)
-    solid_at(kb, V(g["PostX"] + g["PostOD"] / 2 - 0.4, g["EarY"], g["EarT"] + g["PostL"] / 2))
+    solid_at(kb, V(g["PostX"] + g["PostOD"] / 2 - 0.4, g["EarY"], top / 2 + g["EarT"] / 2))
+    solid_at(kb, V(g["PostX"], g["EarY"] + g["PostLobeD"] / 2 + 0.1, top - 0.5))
+    solid_at(kb, V(g["PostX"], g["EarY"] - g["PostReliefD"] / 2 + 0.1, top - 0.5), solid=False)
+    solid_at(kb, V(g["PostX"], g["EarY"] + g["PostBoreD"] / 2 - 0.1, top - g["PostLobeL"] - 0.5),
+             solid=False)
 
 with step("S16", "Cut two slits across each post.", "The slits let the post flex to fit the socket."):
     sk = sketch(kb, "SlitSketch", z="Params.EarT + Params.PostL")
@@ -601,22 +658,45 @@ with step("S16", "Cut two slits across each post.", "The slits let the post flex
              solid=False)
     solid_at(kb, V(g["PostX"] + g["PostOD"] / 2 - 0.4, g["EarY"], g["EarT"] + g["SlitBottom"] / 2))
 
-with step("S17", "Cut five magnet slots in each ear, under a skin on the bar bottom.",
-          "The +y row exits at +y, the outer column at the side. Bar and tongue block the rest."):
-    sk = sketch(kb, "EarSlotSketch", z="Params.SkinT")
-    for sx, sg in (("-", -1), ("", 1)):
-        for i in (-1, 0, 1):
-            sk.slot(f"{sx}Params.PostX + ({i}) * Params.Pitch", "Params.EarY + Params.Pitch", "y", 1, YE)
-        for j in (0, -1):
-            sk.slot(f"{sx}Params.PostX + ({sg}) * Params.Pitch", f"Params.EarY + ({j}) * Params.Pitch",
-                    "x", sg, f"{sx}({XB})")
-    pocket(kb, "EarSlots", sk, "Params.PocketDepth", reverse=True)
-    zm = g["SkinT"] + g["PocketDepth"] / 2
-    solid_at(kb, V(g["PostX"] + g["Pitch"], g["EarY"], zm), solid=False)
-    solid_at(kb, V(g["PostX"] + g["Pitch"], g["EarY"], g["SkinT"] / 2))
-    solid_at(kb, V(g["PostX"], g["EarY"] + g["Pitch"], zm), solid=False)
-    solid_at(kb, V(xb - 0.2, g["EarY"], zm), solid=False)
-    solid_at(kb, V(g["PostX"] - g["Pitch"], g["EarY"], zm))
+with step("S17", "Pad two magnet pads under the bottom corners and cut the screw access holes.",
+          "Pads meet the caps in position 2 and the kink row in position 3."):
+    yb, yt = "-Params.KbDepth", "-Params.KbDepth + Params.CapW"
+    ya = "-Params.KbDepth + Params.KbCornerR"
+    sk = sketch(kb, "PadSketch")
+    for s_, sx in ((1, ""), (-1, "-")):
+        x0 = f"{sx}(Params.PostX - Params.CapW / 2)"
+        xa, xr = f"{sx}(Params.KbW / 2 - Params.KbCornerR)", f"{sx}(Params.KbW / 2)"
+        sk.profile([(x0, yb), (xa, yb), (xr, ya), (xr, yt), (x0, yt)],
+                   [None, ("a", xa, ya, "Params.KbCornerR", s_ > 0), None, None, None])
+    pad(kb, "Pads", sk, "Params.PadT", reverse=True)
+    sk = sketch(kb, "ScrewAccessSketch")
+    for sx in ("-", ""):
+        sk.circle(f"{sx}Params.KbScrewX", "Params.KbScrewY", "Params.ScrewHoleD")
+    pocket(kb, "ScrewAccess", sk, "Params.PadT")
+    solid_at(kb, V(g["PostX"] - 3, g["PadY"], -g["PadT"] / 2))
+    solid_at(kb, V(g["KbScrewX"], g["KbScrewY"], -g["PadT"] / 2), solid=False)
+    expect(kb, lo=(None, -g["KbDepth"], -g["PadT"]))
+
+with step("S18a", "Cut six magnet slots in each pad, under a skin on the pad bottom.",
+          "Each magnet slides in from a pad side and snaps past the lip."):
+    sk = sketch(kb, "PadSlotSketch", z="-Params.PadT + Params.SkinT")
+    for s_, sx in ((1, ""), (-1, "-")):
+        for i, j in PAD_MAGNETS:
+            cx = f"{sx}Params.PostX + ({s_ * i}) * Params.Pitch"
+            cy = f"Params.PadY + ({j}) * Params.Pitch"
+            if j < 0:
+                sk.slot(cx, cy, "y", -1, yb)
+            elif j > 0:
+                sk.slot(cx, cy, "y", 1, yt)
+            else:
+                sk.slot(cx, cy, "x", -s_, f"{sx}(Params.PostX - Params.CapW / 2)")
+    pocket(kb, "PadSlots", sk, "Params.PocketDepth", reverse=True)
+    zm = -g["PadT"] + g["SkinT"] + g["PocketDepth"] / 2
+    for i, j in PAD_MAGNETS:
+        solid_at(kb, V(g["PostX"] + i * g["Pitch"], g["PadY"] + j * g["Pitch"], zm), solid=False)
+        solid_at(kb, V(g["PostX"] + i * g["Pitch"], g["PadY"] + j * g["Pitch"],
+                       -g["PadT"] + g["SkinT"] / 2))
+    solid_at(kb, V(g["PostX"], g["PadY"], zm))
 
 with step("S18", "Place the keyboard in position 1 and add the reference bodies.",
           "Phone and metal pins are bought parts, for fit checks only."):
@@ -642,7 +722,7 @@ with step("S18", "Place the keyboard in position 1 and add the reference bodies.
     expect(phone, size=(g["PhoneW"], g["PhoneL"], g["PhoneT"]),
            lo=(-g["PhoneW"] / 2, g["PhoneTopY"] - g["PhoneL"], 0),
            volume=rr_area(g["PhoneW"], g["PhoneL"], g["PhoneR"]) * g["PhoneT"])
-    expect(kb, lo=(None, None, -g["PlateT"] - Clr - g["EarT"]))
+    expect(kb, lo=(None, None, -g["PlateT"] - Clr - g["EarT"] - g["PadT"]))
 
 
 def overlap(a, b):
@@ -661,19 +741,25 @@ with step("S19", "Check the fits in position 1.", "Each joint keeps Clearance or
     d = sp.gshape(phone).distToShape(upper)[0]
     spec("phone to lips >= Clearance", d >= Clr - 1e-4, f"{d:.3f}")
     spec("phone no overlap with PhoneMount", overlap(phone, mount) < 1e-6)
-    # P2 and P3 from the parameters.
+    # P2 and P3 from the parameters. Both keep the keyboard top edge toward -Y, keys up.
     cap_top = g["ColTop"] + g["CapH"]
-    spec("P2: keyboard floor clears the screen", cap_top > g["PhoneT"], f"{cap_top:.2f}")
-    spec("P2: lips below the screen", g["LipH"] < g["PhoneT"])
-    y_low = g["KinkY"] - cap_top / math.tan(kk)
+    p2_floor = cap_top + g["PadT"]
+    spec("P2: keyboard floor clears the screen", p2_floor > g["PhoneT"], f"{p2_floor:.2f}")
+    spec("P2: keyboard ends before the phone end", CapW / 2 - g["KbLen"] >= g["PhoneTopY"] - g["PhoneL"],
+         f"keyboard to Y={CapW / 2 - g['KbLen']:.1f}")
+    th = math.radians(g["KinkAngle"])
+    tri = g["KbLen"] * math.sin(th) - g["PadT"] * math.cos(th)
+    spec("P3: right triangle of keyboard length and column height", abs(tri - cap_top) < 1e-6,
+         f"{tri:.3f} vs {cap_top:.3f}")
+    # High end: keyboard bottom edge on the kink line. Low end: tongue tip on the plate.
+    y_high = g["KinkY"] - g["PadT"] * math.sin(th)
+    y_low = y_high - g["KbLen"] * math.cos(th)
     y_land = g["RingY"] + g["PhoneW"] / 2
-    z_lip = cap_top - (g["KinkY"] - g["PhoneTopY"]) * math.tan(kk)
-    spec("P3: keyboard edge lands between landscape phone and columns",
-         y_low >= y_land + Clr, f"edge Y {y_low:.2f}, phone edge Y {y_land:.2f}")
-    spec("P3: keyboard plane clears the lips", z_lip >= g["LipH"] + Clr, f"{z_lip:.2f}")
-    slope = (g["KinkRowY"] - y_low) / math.cos(kk)
-    print(f"P3 keyboard edge on plate at Y={y_low:.2f}; gap to landscape phone "
-          f"{y_low - y_land:.2f}; kink row {slope:.2f} mm up the keyboard floor")
+    print(f"P3 angle {g['KinkAngle']:.2f} deg; keyboard from Y={y_low:.1f} (plate) to "
+          f"Y={y_high:.1f} (cap); landscape phone edge at Y={y_land:.1f}")
+    if y_low < y_land + Clr:
+        print(f"P3 CONFLICT: the keyboard needs {y_high - y_low:.1f} mm along the plate; "
+              f"the gap to the landscape phone is {y_high - y_land:.1f} mm")
     lever = CapW / 2 + g["TongueL"]
     spec("P1: tongue tip under the plate", lever <= -g["RingY"], f"{lever:.1f}")
     print(f"P1 peel lever: tongue tip to post axis {lever:.1f} mm "
@@ -685,22 +771,25 @@ decide("D9", "Assembly: slide 8 magnets into the cap side slots past the lips. P
        "Glue each cap on its column; the cap closes the centre pocket and holds the pin.",
        "User: open pockets let magnets jump out. Slots hold each magnet apart under a skin.")
 decide("D10", "Magnet poles on the cap top, rows from +Y to -Y: N S N, N S N, N N N. "
-       "The N N N row is on the kink bevel. Put each ear magnet to attract the cap magnet below it.",
-       "User pattern NSN/NSN/NNN. An ear has 5 magnets: the bar blocks the other slot exits.")
+       "The N N N row is on the kink bevel. Put each pad magnet to attract the cap magnet "
+       "below it in position 2.", "User pattern NSN/NSN/NNN. A pad has 6 magnets: the screw "
+       "hole and the case corner take two places, the centre has no free side.")
 decide("D11", "Print all three parts as modelled with no supports: slots bridge 5.4 mm under a skin.",
        "The bar and the cap stand on flat bottoms. Posts and columns are vertical.")
 decide("D14", "Keyboard side: a full-height dock bar with 3 mm cheeks on both side walls and a "
        "tongue under the plate. No thin neck.",
        "User: the phone hangs on this joint in position 1, so the torque is large.")
-decide("D15", "In position 1 the plate bears on the bar and tongue. Posts take the pull-out force; "
-       "only the banana plugs and slits hold them in the socket.",
-       "Open question: add magnets or a latch between plate bottom and tongue if the posts pull out.")
-decide("D12", f"Position 2: the keyboard floor rests on the cap tops at Z = {cap_top:.2f}, "
-       f"{g['ScreenGap']:.2f} mm above the screen. The ears are at +Y, so the keys are turned 180 deg "
-       "from position 1.", "Open question: confirm the keyboard direction in position 2.")
-decide("D13", f"Position 3: the keyboard edge rests on the plate {-y_low:.1f} mm from the column axes. "
-       f"The kink row is {slope:.1f} mm up the keyboard floor. The case has no magnets there.",
-       "Open question: magnets in the keyboard for position 3 (user: focus on the posts first).")
+decide("D15", "In position 1 the plate bears on the bar and tongue. The banana plugs hold the "
+       "posts in the sockets.", "User: the banana plug is good enough for position 1.")
+decide("D12", f"Position 2: the keyboard lies keys up on the phone, top edge toward the phone "
+       f"top. Its corner pads rest on the caps; the floor is {p2_floor - g['PhoneT']:.1f} mm "
+       "above the screen.", "User: the keys must be usable on the phone.")
+decide("D13", f"Position 3: KinkAngle = {g['KinkAngle']:.2f} deg from the right triangle of the "
+       f"keyboard length ({g['KbLen']:.1f} mm) and the column height ({cap_top:.1f} mm). "
+       "The pad edge row lands on the kink row.", "User: the angle comes from this triangle.")
+decide("D16", "The post bore copies the fitted test post: 3.6 mm bore, 3 lobes at 3.28 mm over "
+       "the last 2 mm, 4.14 mm relief. The post OD stays 8 mm for strength.",
+       "User: the test post fits the banana plug with its flex spaces and sizes.")
 
 PAIRS = [(kb, mount, Clr), (pins[0], kb, Clr), (pins[1], kb, Clr),
          (caps[0], pins[0], Clr), (caps[1], pins[1], Clr)]
@@ -761,7 +850,7 @@ with step("S22", "Export the printed parts in their own frames.",
         print(f"EXPORT {name}: bbox {shp.BoundBox.XLength:.2f}x{shp.BoundBox.YLength:.2f}"
               f"x{shp.BoundBox.ZLength:.2f} vol {shp.Volume:.1f}")
 before = {b.Label: b.Shape.Volume for b in (mount, caps[0], kb)}
-stress(doc, P, ["PhoneW", "PostOD", "MagD", "KinkAngle", "SocketDepth"])
+stress(doc, P, ["PhoneW", "PostOD", "MagD", "TongueL", "SocketDepth"])
 
 for b in (mount, caps[0], kb):
     spec(f"{b.Label} restored after stress", abs(b.Shape.Volume - before[b.Label]) < 1e-3,
